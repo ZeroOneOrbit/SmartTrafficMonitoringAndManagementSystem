@@ -1,0 +1,10 @@
+ultralytics
+opencv-python
+pytesseract
+numpy
+pymongo
+python-dotenv
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib

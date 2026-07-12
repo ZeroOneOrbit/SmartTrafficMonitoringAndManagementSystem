@@ -1,0 +1,7 @@
+.env
+credentials/
+evidence/
+__pycache__/
+.venv/
+venv/
+*.pt
