@@ -1,38 +1,58 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Login from "./components/login";
-import AdminDash from "./pages/adminDash";
-import Register from "./pages/Register";
-import CivilProfile from "./pages/civilprofile";
-import AdminUser from "./pages/adminuser";
-import LoginCivil from "./pages/logincivil";
-
+import { useEffect, useRef } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 const App = () => {
+  const mapContainer = useRef(null);
+
+  useEffect(() => {
+    // Longitude, Latitude
+    const center = [90.4900, 23.6183];
+
+    // Create the map
+    const map = new maplibregl.Map({
+      container: mapContainer.current,
+
+      // OpenFreeMap Dark Theme
+      style: "https://tiles.openfreemap.org/styles/dark",
+
+      center: center,
+
+      zoom: 17,
+    });
+
+    // Add zoom controls
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    // Wait until the map loads
+    map.on("load", () => {
+      // Add a red marker
+      new maplibregl.Marker({
+        color: "red",
+      })
+        .setLngLat(center)
+        .setPopup(
+          new maplibregl.Popup().setHTML(`
+            <h3>My Location</h3>
+            <p>Longitude: ${center[0]}</p>
+            <p>Latitude: ${center[1]}</p>
+          `)
+        )
+        .addTo(map);
+    });
+
+    // Cleanup
+    return () => map.remove();
+  }, []);
+
   return (
-    <div className="min-h-screen
-      bg-[radial-gradient(circle_at_top_left,_rgba(0,255,255,.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,.15),_transparent_40%),linear-gradient(135deg,_#030712,_#081B33,_#050816)]">
-      <Router>
-        <Routes>
-
-          {/* Admin Login (Operator / Command Center) */}
-          <Route path="/login" element={<Login />} />
-
-          
-
-          {/* Admin Dashboard */}
-          <Route path="/admin" element={<AdminDash />} />
-
-          
-
-          
-
-          {/* Any unknown route → back to landing */}
-          <Route path="*" element={<Login />} />
-          
-        </Routes>
-      </Router>
-    </div>
+    <div
+      ref={mapContainer}
+      style={{
+        width: "100%",
+        height: "100vh",
+      }}
+    />
   );
 };
 

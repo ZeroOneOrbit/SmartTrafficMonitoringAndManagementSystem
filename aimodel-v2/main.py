@@ -231,6 +231,8 @@ class SmartTrafficManagementSystem:
                 "total": int(self.total_count_today),
                 "live_count": int(self.live_count),
                 "last_updated": now.isoformat(),
+                "location": settings.LOCATION,
+                "light_status": "red" if self.signal_is_red else "green",
             }
 
             # Upsert by date so a new document is created each day (resets automatically)
