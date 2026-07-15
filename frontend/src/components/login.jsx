@@ -34,7 +34,7 @@ const Login = () => {
     const fullTMAId = `TMA-${rawCode}`;
 
     // Search in localStorage users
-    const usersList = JSON.parse(localStorage.getItem("systemUsers") || "[]");
+    const usersList = JSON.parse(localStorage.getItem("systemUsers") || "[123456]");
     const matchedUser = usersList.find(u => u.userId === fullTMAId);
 
     setTimeout(() => {
@@ -77,13 +77,6 @@ const Login = () => {
       {/* Glow */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-cyan-500/8 blur-[120px] pointer-events-none" />
 
-      {/* Back to landing */}
-      <button
-        onClick={() => navigate("/")}
-        className="absolute top-5 left-5 flex items-center gap-2 text-slate-500 hover:text-slate-200 transition-colors text-xs font-bold cursor-pointer"
-      >
-        <ArrowLeft size={14} /> হোম পেজে ফিরুন
-      </button>
 
       <motion.div
         initial={{ opacity: 0, y: 30 }}
