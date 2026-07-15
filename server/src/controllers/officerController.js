@@ -116,7 +116,7 @@ const getOfficerSelf = async (req, res) => {
         if (!officerData){
         console.log(officerData);
             return res.status(404).json({
-                message: "Officer not found",
+                message: "Unauthorized Entry",
             });
 
         }
