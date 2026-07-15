@@ -14,26 +14,21 @@ const App = () => {
       bg-[radial-gradient(circle_at_top_left,_rgba(0,255,255,.08),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,.15),_transparent_40%),linear-gradient(135deg,_#030712,_#081B33,_#050816)]">
       <Router>
         <Routes>
-          {/* Landing: Role Selection */}
-          <Route path="/" element={<AdminUser />} />
 
           {/* Admin Login (Operator / Command Center) */}
           <Route path="/login" element={<Login />} />
 
-          {/* Civilian Login */}
-          <Route path="/login-civil" element={<LoginCivil />} />
+          
 
           {/* Admin Dashboard */}
           <Route path="/admin" element={<AdminDash />} />
 
-          {/* Civilian / Driver Registration */}
-          <Route path="/register" element={<Register />} />
+          
 
-          {/* Civilian / Driver Profile */}
-          <Route path="/profile" element={<CivilProfile />} />
+          
 
           {/* Any unknown route → back to landing */}
-          <Route path="*" element={<AdminUser />} />
+          <Route path="*" element={<Login />} />
           
         </Routes>
       </Router>
