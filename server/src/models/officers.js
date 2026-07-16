@@ -24,10 +24,9 @@ const officerData = new moongose.Schema(
             required: true,
             unique: true
         },
-        zone:{
+        thanaId:{
             type: String,
-            required: true
-            
+            required: true, 
         }
     })
 
