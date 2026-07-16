@@ -9,10 +9,54 @@ from datetime import datetime, timezone
 from ultralytics import YOLO
 from bson import ObjectId
 from concurrent.futures import ThreadPoolExecutor
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+import threading
+from urllib.parse import urlparse
 
 from config.settings import settings
 from config.database import db
 from config.google_drive import upload_file
+
+class StreamingHandler(BaseHTTPRequestHandler):
+    system = None
+
+    def log_message(self, format, *args):
+        # Suppress logging request details to keep console output clean
+        return
+
+    def do_GET(self):
+        if self.path == '/stream':
+            self.send_response(200)
+            self.send_header('Age', 0)
+            self.send_header('Cache-Control', 'no-cache, private')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
+            self.end_headers()
+            try:
+                while True:
+                    if StreamingHandler.system is None:
+                        continue
+                    with StreamingHandler.system.frame_lock:
+                        frame_bytes = StreamingHandler.system.latest_encoded_frame
+                    if frame_bytes is None:
+                        continue
+                    
+                    self.wfile.write(b'--frame\r\n')
+                    self.send_header('Content-Type', 'image/jpeg')
+                    self.send_header('Content-Length', len(frame_bytes))
+                    self.end_headers()
+                    self.wfile.write(frame_bytes)
+                    self.wfile.write(b'\r\n')
+            except Exception:
+                # Client disconnected
+                pass
+        else:
+            self.send_error(404)
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
 # Set up logging format
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -75,13 +119,21 @@ class SmartTrafficManagementSystem:
         # signal state: toggle manually with 'r' (red) / 'g' (green) keys.
         self.signal_is_red = False
 
+        # emergency mode: toggle with 'e' key
+        self.emergency_mode = False
+
         # ThreadPoolExecutor for background network I/O tasks
         self.executor = ThreadPoolExecutor(max_workers=4)
         # Last time realtime DB was updated (throttle updates)
         self._last_realtime_update = None
 
+        # Lock and frame buffer for live streaming
+        self.frame_lock = threading.Lock()
+        self.latest_encoded_frame = None
+
         self._prepare_folders()
         self._load_daily_count()
+        self._register_camera()
 
     # ---------------- setup helpers ----------------
     def _prepare_folders(self):
@@ -93,9 +145,51 @@ class SmartTrafficManagementSystem:
                     ["timestamp", "track_id", "violation_type", "plate_number", "image_path", "image_drive_id"]
                 )
 
+    def _register_camera(self):
+        """Upserts the camera registration document into the 'cameras' collection.
+
+        All values are sourced from the .env file via the Settings class.
+        The document schema is:
+        {
+          camid, cameraName, areaId, thanaId, streamUrl, status, cameraType,
+          location: { latitude, longitude }
+        }
+        """
+        try:
+            if db is None:
+                logger.warning("MongoDB not available. Camera registration skipped.")
+                return
+
+            camera_doc = {
+                "camid": settings.CAM_ID,
+                "cameraName": settings.CAMERA_NAME,
+                "areaId": settings.AREA_ID,
+                "thanaId": settings.THANA_ID,
+                "streamUrl": settings.STREAM_URL,
+                "status": settings.CAMERA_STATUS,
+                "cameraType": settings.CAMERA_TYPE,
+                "location": {
+                    "latitude": settings.LOCATION_LAT,
+                    "longitude": settings.LOCATION_LNG,
+                },
+            }
+
+            db.cameras.update_one(
+                {"camid": settings.CAM_ID},
+                {"$set": camera_doc},
+                upsert=True,
+            )
+            logger.info(
+                f"Camera registered/updated in DB: camid={settings.CAM_ID}, "
+                f"name='{settings.CAMERA_NAME}', streamUrl='{settings.STREAM_URL}'"
+            )
+        except Exception as e:
+            logger.error(f"Failed to register camera in DB: {e}")
+
     def _load_daily_count(self):
         """Loads today's daily count of total vehicles processed."""
         today = datetime.now().strftime("%Y-%m-%d")
+        self.current_date = today
         if os.path.exists(self.DAILY_COUNT_FILE):
             try:
                 with open(self.DAILY_COUNT_FILE) as f:
@@ -117,12 +211,51 @@ class SmartTrafficManagementSystem:
         except Exception as e:
             logger.error(f"Failed to write daily count: {e}")
 
+    def _start_streaming_server(self):
+        """Starts the MJPEG streaming server in a background thread."""
+        StreamingHandler.system = self
+        port = 8080
+        if settings.STREAM_URL:
+            try:
+                parsed = urlparse(settings.STREAM_URL)
+                if parsed.port:
+                    port = parsed.port
+            except Exception as e:
+                logger.error(f"Failed to parse port from STREAM_URL: {e}")
+
+        def run_server():
+            try:
+                server = ThreadedHTTPServer(('0.0.0.0', port), StreamingHandler)
+                logger.info(f"MJPEG Streaming Server started at http://localhost:{port}/stream")
+                
+                # Fetch and print local IP addresses to make it easy to connect from other devices
+                import socket
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.settimeout(0)
+                    s.connect(('10.254.254.254', 1))
+                    ip = s.getsockname()[0]
+                    s.close()
+                    logger.info(f"To stream on other devices in the same network, use: http://{ip}:{port}/stream")
+                except Exception:
+                    pass
+                
+                server.serve_forever()
+            except Exception as e:
+                logger.error(f"Failed to start MJPEG streaming server on port {port}: {e}")
+
+        t = threading.Thread(target=run_server, daemon=True)
+        t.start()
+
     # ---------------- main loop ----------------
     def run(self):
         """Starts the video detection loop."""
         if not self.cap.isOpened():
             logger.error("Error: Could not open video file or camera stream.")
             return
+
+        # Start the live streaming MJPEG server
+        self._start_streaming_server()
 
         logger.info("Smart Traffic Management System started. Press [q] to quit, [r] for RED light, [g] for GREEN light.")
         while True:
@@ -152,6 +285,10 @@ class SmartTrafficManagementSystem:
                 self.signal_is_red = True
             elif key == ord('g'):
                 self.signal_is_red = False
+            elif key == ord('e'):
+                self.emergency_mode = not self.emergency_mode
+                state_str = "ACTIVATED" if self.emergency_mode else "DEACTIVATED"
+                logger.info(f"[EMERGENCY] Emergency mode {state_str} via keyboard.")
 
         # Graceful cleanup
         self.cap.release()
@@ -219,6 +356,23 @@ class SmartTrafficManagementSystem:
                 return
 
             now = datetime.now(timezone.utc)
+            
+            # Reset stats if the day rolls over to the next day
+            local_today = datetime.now().strftime("%Y-%m-%d")
+            if not hasattr(self, 'current_date'):
+                self.current_date = local_today
+            elif local_today != self.current_date:
+                logger.info(f"New day detected: {local_today}. Resetting daily statistics.")
+                self.current_date = local_today
+                self.total_count_today = 0
+                self.tracked_ids.clear()
+                self.wrong_way_count = 0
+                self.wrong_way_ids.clear()
+                self.violated_ids.clear()
+                self.wrong_way_logged.clear()
+                self.captured_ids.clear()
+                self._save_daily_count()
+
             # throttle to ~1s updates
             if self._last_realtime_update is not None:
                 elapsed = (now - self._last_realtime_update).total_seconds()
@@ -231,12 +385,18 @@ class SmartTrafficManagementSystem:
                 "total": int(self.total_count_today),
                 "live_count": int(self.live_count),
                 "last_updated": now.isoformat(),
-                "location": settings.LOCATION,
+                "location": {
+                    "latitude": settings.LOCATION_LAT,
+                    "longitude": settings.LOCATION_LNG,
+                },
                 "light_status": "red" if self.signal_is_red else "green",
+                "emergency_mode": self.emergency_mode,
+                "cam_id": settings.CAM_ID,
+                "stream_url": settings.STREAM_URL,
             }
 
-            # Upsert by date so a new document is created each day (resets automatically)
-            db.realtime_data.update_one({"date": today}, {"$set": doc}, upsert=True)
+            # Upsert by cam_id so the existing document for this camera is updated, rather than adding a new document
+            db.realtime_data.update_one({"cam_id": settings.CAM_ID}, {"$set": doc}, upsert=True)
             self._last_realtime_update = now
         except Exception as e:
             logger.error(f"Failed to update realtime_data collection: {e}")
@@ -448,6 +608,16 @@ class SmartTrafficManagementSystem:
                 cv.putText(output, label, (x1, max(y1 - 10, 15)), cv.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
         self._draw_hud(output)
+
+        # Encode output frame to JPEG bytes for the HTTP live stream
+        try:
+            _, jpeg_buf = cv.imencode('.jpg', output)
+            if jpeg_buf is not None:
+                with self.frame_lock:
+                    self.latest_encoded_frame = jpeg_buf.tobytes()
+        except Exception as e:
+            logger.error(f"Failed to encode frame for live stream: {e}")
+
         # update realtime DB (throttled inside the helper)
         try:
             self._update_realtime_db()
@@ -466,8 +636,20 @@ class SmartTrafficManagementSystem:
         signal_text = "SIGNAL: RED" if self.signal_is_red else "SIGNAL: GREEN"
         signal_color = (0, 0, 255) if self.signal_is_red else (0, 255, 0)
         cv.putText(output, signal_text, (20, 145), cv.FONT_HERSHEY_SIMPLEX, 0.8, signal_color, 2)
-        cv.putText(output, "[r]=red  [g]=green  [q]=quit", (20, 460),
-                   cv.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+
+        # Emergency mode indicator
+        if self.emergency_mode:
+            emergency_text = "!! EMERGENCY MODE ACTIVE !!"
+            cv.putText(output, emergency_text, (20, 180),
+                       cv.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            # Flashing red border
+            cv.rectangle(output, (2, 2), (638, 478), (0, 0, 255), 3)
+        else:
+            cv.putText(output, "EMERGENCY: OFF", (20, 180),
+                       cv.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 100), 1)
+
+        cv.putText(output, "[r]=red  [g]=green  [e]=emergency  [q]=quit", (20, 460),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
 
 
 if __name__ == "__main__":

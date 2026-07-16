@@ -24,5 +24,17 @@ class Settings:
     MODEL_PATH: str = os.getenv("MODEL_PATH", str(BASE_DIR / "models" / "best.pt"))
     VIDEO_PATH: str = os.getenv("VIDEO_PATH", str(BASE_DIR / "rec" / "video2.mp4"))
 
+    # Camera Registration Config (read from .env, sent to MongoDB on startup)
+    CAM_ID: str = os.getenv("CAM_ID", "CAM001")
+    CAMERA_NAME: str = os.getenv("CAMERA_NAME", "Default Camera")
+    AREA_ID: str = os.getenv("AREA_ID", "AREA_01")
+    THANA_ID: str = os.getenv("THANA_ID", "THANA_01")
+    STREAM_URL: str = os.getenv("STREAM_URL", "")
+    CAMERA_STATUS: str = os.getenv("CAMERA_STATUS", "active")
+    CAMERA_TYPE: str = os.getenv("CAMERA_TYPE", "fixed")
+    LOCATION_LAT: float = float(os.getenv("LOCATION_LAT", "0.0"))
+    LOCATION_LNG: float = float(os.getenv("LOCATION_LNG", "0.0"))
+
 # Global configuration instance
 settings = Settings()
+

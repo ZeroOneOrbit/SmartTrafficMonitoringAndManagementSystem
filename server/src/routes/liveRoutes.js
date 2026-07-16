@@ -1,8 +1,9 @@
 import express from "express"
-import {getData} from "../controllers/dataController.js"
+import {getCamera, getAllCam} from "../controllers/dataController.js"
 
 const router= express.Router()
 
-router.get("/data", getData)
+router.get("/camera/:camId", getCamera)
+router.get("/camera", getAllCam)    
 
 export default router
