@@ -236,15 +236,6 @@ const LoginCivil = () => {
               এখানে নিবন্ধন করুন
             </button>
           </div>
-          <div className="text-center text-xs text-slate-500 font-semibold">
-            প্রশাসক কমান্ড পোর্টাল?{" "}
-            <button
-              onClick={() => navigate("/login")}
-              className="text-blue-400 hover:text-blue-300 font-bold cursor-pointer transition-colors"
-            >
-              Admin Login →
-            </button>
-          </div>
         </div>
 
         {/* SSL Footer */}

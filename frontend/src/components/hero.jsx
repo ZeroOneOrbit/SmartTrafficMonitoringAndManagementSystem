@@ -1,5 +1,6 @@
 import { ArrowRight, LogIn, UserPlus } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 const container = {
   hidden: {},
@@ -57,6 +58,7 @@ const item = {
 };
 
 const Hero = () => {
+  const navigate = useNavigate();
   return (
     <motion.section
       variants={container}
@@ -112,6 +114,7 @@ const Hero = () => {
           {/* Login */}
 
           <motion.button
+            onClick={() => navigate("/logincivil")}
             whileHover={{
               scale: 1.05,
               y: -5,
@@ -119,7 +122,7 @@ const Hero = () => {
             whileTap={{
               scale: 0.95,
             }}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-500 px-7 py-3.5 font-bold text-slate-900 shadow-[0_5px_25px_rgba(6,182,212,.35)] transition-all duration-300 hover:shadow-[0_8px_35px_rgba(6,182,212,.5)]"
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-sky-500 px-7 py-3.5 font-bold text-slate-900 shadow-[0_5px_25px_rgba(6,182,212,.35)] transition-all duration-300 hover:shadow-[0_8px_35px_rgba(6,182,212,.5)] cursor-pointer"
           >
             <LogIn size={20} />
             লগইন করুন
@@ -129,6 +132,7 @@ const Hero = () => {
           {/* Register */}
 
           <motion.button
+            onClick={() => navigate("/register")}
             whileHover={{
               scale: 1.05,
               y: -5,
@@ -136,7 +140,7 @@ const Hero = () => {
             whileTap={{
               scale: 0.95,
             }}
-            className="flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-slate-900 px-7 py-3.5 font-bold text-cyan-400 transition-all duration-300 hover:border-cyan-400 hover:bg-slate-800 hover:shadow-[0_0_20px_rgba(6,182,212,.25)]"
+            className="flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-slate-900 px-7 py-3.5 font-bold text-cyan-400 transition-all duration-300 hover:border-cyan-400 hover:bg-slate-800 hover:shadow-[0_0_20px_rgba(6,182,212,.25)] cursor-pointer"
           >
             <UserPlus size={20} />
             রেজিস্ট্রেশন
