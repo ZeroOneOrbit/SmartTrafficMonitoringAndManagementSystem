@@ -1,4 +1,5 @@
 import rLDAta from "../models/realtimedata.js";
+import Camera from "../models/camera.js";
 
 
 
@@ -37,7 +38,25 @@ const getCamera = async (req, res) => {
 
 const getAllCam= async (req, res) =>{
     try{
-        const camData= await rLDAta.find().sort({ _id: -1 });
+        const thanaId = String(req.query.thanaId || "").trim();
+        let query = {};
+
+        // Realtime records store only cam_id. Resolve the cameras registered
+        // to this thana first, then return live data for those camera IDs.
+        if (thanaId && thanaId.toLowerCase() !== "admin") {
+            const cameras = await Camera.find(
+                { thanaId },
+                { camid: 1, _id: 0 }
+            ).lean();
+
+            query = {
+                cam_id: {
+                    $in: cameras.map((camera) => camera.camid)
+                }
+            };
+        }
+
+        const camData = await rLDAta.find(query).sort({ _id: -1 });
         return res.status(200).json({
             message: "Camera data fetched successfully",
             data: camData

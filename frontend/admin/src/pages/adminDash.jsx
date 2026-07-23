@@ -8,7 +8,7 @@ import MapPanel from "../components/MapPanel";
 import StatsRow from "../components/StatsRow";
 import TrafficChart from "../components/TrafficChart";
 import AIInsights from "../components/AIInsights";
-import SystemLog from "../components/SystemLog";
+
 import CameraFeeds from "../components/CameraFeeds";
 import AdminProfile from "../components/adprofile";
 
@@ -112,17 +112,15 @@ const AdminDash = () => {
                   <StatsRow />
 
                   {/* ROW 3: Traffic Chart (left 60%) + System Log (right 40%) */}
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <div className="md:col-span-3">
-                      <TrafficChart />
-                    </div>
-                    <div className="md:col-span-2">
-                      <SystemLog searchTerm={searchTerm} />
-                    </div>
-                  </div>
+                  {/* ROW 3: Traffic Chart */}
+<div className="w-full h-[350px]">
+  <TrafficChart />
+</div>
 
-                  {/* ROW 4: Camera Feeds strip */}
-                  <CameraFeeds />
+{/* ROW 4: Camera Feeds */}
+<div className="w-full">
+  <CameraFeeds />
+</div>
                 </div>
 
                 {/* ── RIGHT COLUMN: AI Insights ─────────────── */}

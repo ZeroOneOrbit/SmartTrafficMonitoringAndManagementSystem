@@ -35,8 +35,8 @@ const MapPanel = ({ emergencyMode }) => {
          const map = new maplibregl.Map({
               container: mapContainer.current,
         
-              // OpenFreeMap Dark Theme
-              style: "https://tiles.openfreemap.org/styles/dark",
+              // Use a public MapLibre-compatible Carto dark style
+              style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
         
               center: center,
         

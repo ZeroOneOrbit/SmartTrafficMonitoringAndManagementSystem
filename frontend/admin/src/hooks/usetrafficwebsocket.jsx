@@ -4,13 +4,19 @@ const useTrafficWebSocket = (onDataReceived) => {
 
     useEffect(() => {
 
-        const ws = new WebSocket(
-            `${import.meta.env.VITE_SERVER_URL}`
-        );
+        const websocketUrl =
+            import.meta.env.VITE_WEBSOCKET_URL ||
+            import.meta.env.VITE_SERVER_URL ||
+            "ws://localhost:5000";
+
+        console.log("Connecting to WebSocket URL:", websocketUrl);
+
+        const ws = new WebSocket(websocketUrl);
 
         ws.onopen = () => {
             console.log(
-                "Connected to Realtime Traffic WebSocket Server"
+                "Connected to Realtime Traffic WebSocket Server",
+                websocketUrl
             );
         };
 
@@ -32,9 +38,20 @@ const useTrafficWebSocket = (onDataReceived) => {
                     realtimeData
                 );
 
-                onDataReceived(
-                    realtimeData
-                );
+                if (Array.isArray(realtimeData)) {
+                    realtimeData.forEach((camera) => {
+                        if (camera && camera.cam_id) {
+                            onDataReceived(camera);
+                        }
+                    });
+                } else if (realtimeData && realtimeData.cam_id) {
+                    onDataReceived(realtimeData);
+                } else {
+                    console.warn(
+                        "Unexpected realtime_data payload:",
+                        realtimeData
+                    );
+                }
             }
         };
 

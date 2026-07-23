@@ -10,7 +10,8 @@ const createVFinal = async (req , res )=>{
             location,
             vehicleNumber,
             licenseNumber,
-            officerRef
+            officerRef,
+            caseStatus,
 
         } = req.body
 
@@ -24,7 +25,7 @@ const createVFinal = async (req , res )=>{
             vehicleNumber,
             licenseNumber,
             officerRef,
-            caseStatus: "Filled"
+            caseStatus
         })
         await newCase.save()
         
@@ -44,4 +45,33 @@ const createVFinal = async (req , res )=>{
     }
 }
 
-export {createVFinal}
+
+const getVFinal = async (req, res)=>{
+    try{
+            
+        const data = await vFinal.find()
+        if (!data){
+            console.log(data);
+                return res.status(404).json({
+                    message: "Undefiend Data",
+                });
+
+            }
+            return res.status(200).json({
+                message: "login successful",
+                vFData: data,
+            });
+        }
+    catch(err){
+        console.error(err);
+        return res.status(500).json({
+            message: "Server error",
+        });
+    }
+
+    
+
+}
+
+
+export {createVFinal , getVFinal}
