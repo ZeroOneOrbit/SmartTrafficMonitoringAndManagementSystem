@@ -1,9 +1,19 @@
 import officer from "../models/officers.js";
 
+const isValidSpecialId = (specialId) => {
+    const parsedId = Number(specialId);
+    return Number.isInteger(parsedId) && parsedId >= 100000 && parsedId <= 999999;
+};
 
 const createOfficer = async (req, res) => {
     try {
         const {name, email, role, phone, specialId, zone} = req.body;
+
+        if (!isValidSpecialId(specialId)) {
+            return res.status(400).json({
+                message: "Special ID must be a 6-digit number",
+            });
+        }
 
         const exitingOfficer = await officer.findOne({
             email: email,
@@ -58,7 +68,7 @@ const updateOfficer = async (req, res) => {
     try{
         const {name, phone, email} = req.body;
         const updatedOfficer = await officer.findOneAndUpdate(
-            {specialId: req.headers.specialid},
+            { specialId: req.headers["x-special-id"] },
             {name, phone, email},
             {new: true}
         );
@@ -83,6 +93,24 @@ const updateOfficer = async (req, res) => {
 const updateOfficerByAdmin = async (req, res) => {
     try{
         const {role, zone, specialId} = req.body;
+
+        if (!isValidSpecialId(specialId)) {
+            return res.status(400).json({
+                message: "Special ID must be a 6-digit number",
+            });
+        }
+
+        const existingSpecialId = await officer.findOne({
+            specialId,
+            email: { $ne: req.params.id },
+        });
+
+        if (existingSpecialId) {
+            return res.status(400).json({
+                message: "Special ID already exists",
+            });
+        }
+
         const updatedOfficer = await officer.findOneAndUpdate(
             {email: req.params.id},
             {role, zone, specialId},

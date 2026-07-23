@@ -24,13 +24,12 @@ const officerData = new moongose.Schema(
             required: true,
             unique: true
         },
-        thanaId:{
+        zone:{
             type: String,
             required: true, 
         }
     })
 
 export default moongose.model("officer", officerData);
-
 
 

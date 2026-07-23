@@ -22,8 +22,13 @@ const vFinal = new mongoose.Schema(
             }
         },
         fine: {
-            type: String,
-            require: true
+            status:{
+                type: String,
+            }, 
+            fee: {
+                type: String,
+            }
+
         },
         location: {
             type: String,

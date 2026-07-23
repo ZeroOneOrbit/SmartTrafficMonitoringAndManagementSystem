@@ -1,171 +1,994 @@
-import React, { useState, useEffect } from "react";
-import { BrainCircuit, RefreshCw, ChevronRight, Zap } from "lucide-react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  ShieldAlert,
+  Car,
+  MapPin,
+  Clock,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+
 import toast from "react-hot-toast";
 
-const AIInsights = () => {
-  const [timeLeft, setTimeLeft] = useState(150); // 2 minutes and 30 seconds = 150s
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
-  // Optimization Timer countdown
-  useEffect(() => {
-    const timerInterval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          return 300; // Reset to 5 mins
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerInterval);
-  }, []);
 
-  // Format seconds to MM:SS in Bengali numbers
-  const formatTimeBengali = (sec) => {
-    const minStr = Math.floor(sec / 60).toString().padStart(2, "0");
-    const secStr = (sec % 60).toString().padStart(2, "0");
-    
-    // Map digits to Bengali digits
-    const bengaliDigits = "০১২৩৪৫৬৭৮৯";
-    const mappedMin = minStr.replace(/\d/g, (d) => bengaliDigits[d]);
-    const mappedSec = secStr.replace(/\d/g, (d) => bengaliDigits[d]);
-    
-    return `${mappedMin}:${mappedSec} মিনিট`;
+
+// ======================================================
+// SINGLE VIOLATION CARD
+// ======================================================
+
+const ViolationCard = ({
+  violation,
+}) => {
+
+  const [
+    decision,
+    setDecision,
+  ] = useState(null);
+
+
+
+
+  // ======================================================
+  // GOOGLE DRIVE IMAGE URL
+  // ======================================================
+
+  const getGoogleDriveImageUrl = (
+    url
+  ) => {
+
+    if (!url) {
+      return null;
+    }
+
+
+    const fileId =
+      url.match(
+        /\/d\/([^/]+)/
+      )?.[1];
+
+
+    if (!fileId) {
+      return null;
+    }
+
+
+    return (
+      `https://drive.google.com/thumbnail?id=${fileId}&sz=w500`
+    );
+
   };
 
-  const handleOptimizeSignals = () => {
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 1500)),
+
+  // ======================================================
+  // FORMAT DATE
+  // ======================================================
+
+  const formatDate = (
+    dateString
+  ) => {
+
+    if (!dateString) {
+      return "N/A";
+    }
+
+
+    return new Date(
+      dateString
+    ).toLocaleString(
+      "bn-BD",
       {
-        loading: "সিগন্যাল অপ্টিমাইজ করা হচ্ছে...",
-        success: "সবগুলি সিগন্যাল অপ্টিমাইজ করা হয়েছে! সময় বাঁচবে ০২:৩০ মিনিট।",
-        error: "অপ্টিমাইজেশন ব্যর্থ হয়েছে।"
-      },
-      {
-        style: {
-          background: "#1e293b",
-          color: "#fff",
-          border: "1px solid rgba(59, 130, 246, 0.2)"
-        }
+        dateStyle: "medium",
+        timeStyle: "short",
       }
     );
-    // Reset timer
-    setTimeLeft(300); // 5 minutes
+
   };
 
-  const handleTrackEmergency = () => {
-    toast.success("জরুরি অ্যাম্বুলেন্স ই-১০১ ট্র্যাকিং সক্রিয় করা হয়েছে। ম্যাপ ভিউ দেখুন।", {
-      style: { background: "#1e293b", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.2)" }
-    });
-  };
+const fineData = {
+  signal_violation: {
+    status: "pending",
+    fee: "2000",
+  },
 
-  const handleReroute = () => {
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 1000)),
-      {
-        loading: "বিকল্প রুট হিসাব করা হচ্ছে...",
-        success: "বিকল্প রুট সফলভাবে গণনায় এসেছে। ৩টি নোড রি-রাইউট করা হয়েছে।",
-        error: "ব্যর্থ হয়েছে।"
+  wrong_way: {
+    status: "pending",
+    fee: "4000",
+  },
+};
+
+
+// ======================================================
+// DECISION
+// ======================================================
+
+const handleDecision = async (value, violation) => {
+  const getOfficer = JSON.parse(
+    sessionStorage.getItem("officer")
+  );
+
+  try {
+
+    // ======================================================
+    // DETERMINE CASE STATUS
+    // ======================================================
+
+    const caseStatus =
+      value === "guilty"
+        ? "filed"
+        : "dispatched";
+
+
+    // ======================================================
+    // CREATE FINAL VIOLATION DATA
+    // ======================================================
+
+    const finalViolationData = {
+
+      time: violation.time,
+
+      carType: violation.car_type,
+
+      violationType: violation.violation_type,
+
+      evedience: {
+        driveURI:
+          violation.evidence?.driveurl || "",
       },
-      {
-        style: { background: "#1e293b", color: "#fff", border: "1px solid rgba(139, 92, 246, 0.2)" }
+
+      location: violation.location,
+
+      vehicleNumber:
+        violation.vehicle_number || "N/A",
+
+      licenseNumber: "N/A",
+
+      officerRef: {
+        name: getOfficer?.name || "N/A",
+
+        rank: getOfficer?.role || "N/A",
+
+        area: getOfficer?.zone || "N/A",
+      },
+
+      caseStatus: caseStatus,
+    };
+
+
+    // ======================================================
+    // ADD FINE ONLY IF GUILTY
+    // ======================================================
+
+    if (caseStatus === "filed") {
+
+      const selectedFine =
+        fineData[violation.violation_type];
+
+
+      // Check if fine exists
+      if (!selectedFine) {
+
+        toast.error(
+          "এই violation-এর জন্য কোনো fine নির্ধারণ করা হয়নি!"
+        );
+
+        return;
       }
+
+
+      // Add fine data
+      finalViolationData.fine = {
+
+        status: selectedFine.status,
+
+        fee: selectedFine.fee,
+
+      };
+
+    }
+
+
+    // ======================================================
+    // CREATE FINAL CASE
+    // ======================================================
+
+    const response = await axios.post(
+
+      `${import.meta.env.VITE_SERVER_API}/violation/admin/create`,
+
+      finalViolationData
+
     );
-  };
+
+
+    // ======================================================
+    // DELETE ORIGINAL VIOLATION
+    // ======================================================
+
+    if (response.status === 201) {
+
+      await axios.delete(
+
+        `${import.meta.env.VITE_SERVER_API}/violation/admin`,
+
+        {
+          headers: {
+            id: violation.id,
+          },
+        }
+
+      );
+
+
+      // ======================================================
+      // SUCCESS MESSAGE
+      // ======================================================
+
+      if (value === "guilty") {
+
+        toast.success(
+          "ভেহিকেলটি দোষী হিসেবে চিহ্নিত করা হয়েছে!"
+        );
+
+      } else {
+
+        toast.success(
+          "ভেহিকেলটি নির্দোষ হিসেবে চিহ্নিত করা হয়েছে!"
+        );
+
+      }
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "Violation processing error:",
+
+      error.response?.data ||
+      error.message
+
+    );
+
+    toast.error(
+      "Violation process করা যায়নি!"
+    );
+
+  }
+};
+
+
+  const imageUrl =
+    getGoogleDriveImageUrl(
+      violation.evidence?.driveurl
+    );
+
 
   return (
-    <div className="w-full bg-slate-950/60 border border-blue-950/40 rounded-3xl p-5 backdrop-blur-xl flex flex-col justify-between relative overflow-hidden h-[330px]">
-      
-      {/* Background radial accent */}
-      <div className="absolute -top-10 -right-10 w-20 h-20 rounded-full bg-blue-500/5 blur-[40px] pointer-events-none" />
 
-      {/* Header */}
-      <div className="flex items-center gap-2 text-blue-400 border-b border-slate-900 pb-3 mb-3">
-        <BrainCircuit size={16} className="animate-pulse" />
-        <h3 className="text-xs font-bold tracking-widest uppercase">
-          AI অ্যানালিটিক্স ইনসাইট
-        </h3>
-      </div>
+    <div
+      className="
+        w-full
+        bg-slate-900/50
+        border
+        border-slate-800
+        rounded-2xl
+        p-3
+        hover:border-blue-500/30
+        transition-all
+      "
+    >
 
-      {/* Grid Elements */}
-      <div className="flex-grow space-y-3.5">
-        
-        {/* Element 1: Traffic Jam Forecast */}
-        <div className="bg-slate-900/30 border border-slate-900/60 p-3 rounded-2xl flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[9px] font-bold tracking-wider mb-1.5">
-            <span className="text-slate-500 uppercase">ট্রাফিক জ্যাম পূর্বাভাস</span>
-            <span className="text-red-400 font-extrabold flex items-center gap-0.5">
-              <Zap size={10} className="animate-bounce" />
-              <span>উচ্চ ঝুঁকি</span>
-            </span>
-          </div>
-          
-          <div className="flex items-center justify-between text-xs font-bold text-white mb-2">
-            <span>মিরপুর - ফার্মগেট করিডর</span>
-            <span className="text-red-400 font-mono">৭৮%</span>
-          </div>
+      {/* ================================================= */}
+      {/* MAIN INFORMATION */}
+      {/* ================================================= */}
 
-          <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-red-500 h-full rounded-full w-[78%] animate-pulse" />
-          </div>
-        </div>
+      <div
+        className="
+          flex
+          gap-3
+          items-start
+        "
+      >
 
-        {/* Element 2: Signal Optimization */}
-        <div className="bg-slate-900/30 border border-slate-900/60 p-3 rounded-2xl flex items-center justify-between">
-          <div className="flex flex-col text-left">
-            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">সিগন্যাল অপ্টিমাইজেশন</span>
-            <span className="text-xs font-bold text-slate-400 mt-0.5">সময় সাশ্রয় হবে</span>
-          </div>
+        {/* IMAGE */}
 
-          <div className="flex items-center gap-2.5">
-            <span className="text-sm font-black font-sans text-blue-400 tracking-wide">
-              {formatTimeBengali(timeLeft)}
-            </span>
-            <button 
-              onClick={handleOptimizeSignals}
-              className="p-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-blue-400 hover:border-blue-500/30 transition-all duration-200 cursor-pointer"
+        <div
+          className="
+            w-28
+            h-24
+            flex-shrink-0
+            rounded-xl
+            overflow-hidden
+            border
+            border-slate-800
+            bg-slate-950
+          "
+        >
+
+          {imageUrl ? (
+
+            <img
+              src={imageUrl}
+              alt="Violation Evidence"
+              className="
+                w-full
+                h-full
+                object-cover
+              "
+            />
+
+          ) : (
+
+            <div
+              className="
+                w-full
+                h-full
+                flex
+                items-center
+                justify-center
+                text-[10px]
+                text-slate-500
+              "
             >
-              <RefreshCw size={12} className="animate-spin-slow" />
-            </button>
+
+              No Image
+
+            </div>
+
+          )}
+
+        </div>
+
+
+        {/* INFORMATION */}
+
+        <div
+          className="
+            flex-1
+            min-w-0
+          "
+        >
+
+          {/* VIOLATION TYPE */}
+
+          <div
+            className="
+              flex
+              items-start
+              gap-1
+              mb-2
+            "
+          >
+
+            <ShieldAlert
+              size={13}
+              className="
+                text-red-400
+                flex-shrink-0
+                mt-0.5
+              "
+            />
+
+            <h3
+              className="
+                text-[11px]
+                leading-tight
+                font-bold
+                text-red-400
+                uppercase
+              "
+            >
+
+              {violation.violation_type
+                ?.replaceAll(
+                  "_",
+                  " "
+                )
+                .toUpperCase()}
+
+            </h3>
+
           </div>
+
+
+          {/* VEHICLE */}
+
+          <div
+            className="
+              flex
+              items-center
+              gap-1
+              text-[10px]
+              text-slate-400
+              mb-1
+            "
+          >
+
+            <Car
+              size={11}
+              className="text-blue-400"
+            />
+
+            <span>
+
+              {violation.car_type}
+
+            </span>
+
+          </div>
+
+
+          {/* VEHICLE NUMBER */}
+
+          <div
+            className="
+              flex
+              items-center
+              gap-1
+              text-[10px]
+              text-slate-400
+              mb-1
+            "
+          >
+
+            <span
+              className="
+                text-purple-400
+                font-bold
+              "
+            >
+
+              #
+
+            </span>
+
+            <span>
+
+              {violation.vehicle_number}
+
+            </span>
+
+          </div>
+
+
+          {/* TRACK ID */}
+
+          <div
+            className="
+              flex
+              items-center
+              gap-1
+              text-[10px]
+              text-slate-400
+              mb-1
+            "
+          >
+
+            <span
+              className="
+                text-blue-400
+                font-bold
+              "
+            >
+
+              Track:
+
+            </span>
+
+            <span>
+
+              #{violation.trackid}
+
+            </span>
+
+          </div>
+
+
+          {/* LOCATION */}
+
+          <div
+            className="
+              flex
+              items-start
+              gap-1
+              text-[10px]
+              text-slate-400
+            "
+          >
+
+            <MapPin
+              size={11}
+              className="
+                text-red-400
+                flex-shrink-0
+                mt-0.5
+              "
+            />
+
+            <span>
+
+              {violation.location}
+
+            </span>
+
+          </div>
+
         </div>
 
       </div>
 
-      {/* Quick Actions List */}
-      <div className="mt-4 border-t border-slate-900 pt-3 space-y-1.5">
-        <span className="block text-[8px] text-slate-600 font-bold uppercase tracking-widest mb-1">
-          দ্রুত অ্যাকশন
+
+      {/* TIME */}
+
+      <div
+        className="
+          flex
+          items-center
+          gap-1
+          text-[9px]
+          text-slate-500
+          mt-3
+          pt-2
+          border-t
+          border-slate-800
+        "
+      >
+
+        <Clock
+          size={11}
+        />
+
+        <span>
+
+          {formatDate(
+            violation.time
+          )}
+
         </span>
-        
-        {/* Action 1 */}
-        <button 
-          onClick={handleOptimizeSignals}
-          className="w-full flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-900/60 text-[10px] font-bold text-slate-400 hover:text-white transition-all duration-150 cursor-pointer"
+
+      </div>
+
+
+      {/* DECISION BUTTONS */}
+
+      <div
+        className="
+          grid
+          grid-cols-2
+          gap-2
+          mt-3
+        "
+      >
+
+        {/* GUILTY */}
+
+        <button
+          onClick={() =>
+            handleDecision(
+              "guilty", 
+              violation
+            )
+          }
+          className={`
+            flex
+            items-center
+            justify-center
+            gap-1
+            py-2
+            rounded-lg
+            border
+            text-[10px]
+            font-bold
+
+            ${
+              decision === "guilty"
+
+                ? "bg-red-500 text-white border-red-400"
+
+                : "bg-red-500/10 text-red-400 border-red-500/20"
+            }
+          `}
         >
-          <span>সিগন্যাল অপ্টিমাইজ করুন</span>
-          <ChevronRight size={12} className="text-slate-600" />
+
+          <CheckCircle
+            size={12}
+          />
+
+          Guilty
+
         </button>
 
-        {/* Action 2 */}
-        <button 
-          onClick={handleTrackEmergency}
-          className="w-full flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-900/60 text-[10px] font-bold text-slate-400 hover:text-white transition-all duration-150 cursor-pointer"
+
+        {/* NOT GUILTY */}
+
+        <button
+          onClick={() =>
+            handleDecision(
+              "not_guilty", 
+              violation
+            )
+          }
+          className={`
+            flex
+            items-center
+            justify-center
+            gap-1
+            py-2
+            rounded-lg
+            border
+            text-[10px]
+            font-bold
+
+            ${
+              decision === "not_guilty"
+
+                ? "bg-green-500 text-white border-green-400"
+
+                : "bg-green-500/10 text-green-400 border-green-500/20"
+            }
+          `}
         >
-          <span>জরুরি যানবাহন ট্র্যাক করুন</span>
-          <ChevronRight size={12} className="text-slate-600" />
+
+          <XCircle
+            size={12}
+          />
+
+          Not Guilty
+
         </button>
 
-        {/* Action 3 */}
-        <button 
-          onClick={handleReroute}
-          className="w-full flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-900/60 text-[10px] font-bold text-slate-400 hover:text-white transition-all duration-150 cursor-pointer"
-        >
-          <span>ট্রাফিক রিরাইউট করুন</span>
-          <ChevronRight size={12} className="text-slate-600" />
-        </button>
       </div>
 
     </div>
+
   );
+
 };
 
-export default AIInsights;
+
+// ======================================================
+// VIOLATION LIST
+// ======================================================
+
+const ViolationList = () => {
+
+
+  const [
+    violations,
+    setViolations,
+  ] = useState([]);
+
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+
+  const [
+    showAll,
+    setShowAll,
+  ] = useState(false);
+
+
+    const navigate  = useNavigate()
+  // ======================================================
+  // FETCH DATA
+  // ======================================================
+
+  const getViolations = async () => {
+
+  const getOfficer =
+    JSON.parse(
+      sessionStorage.getItem("officer")
+    );
+
+
+  try {
+
+    const response =
+      await axios.get(
+        `${import.meta.env.VITE_SERVER_API}/violation/admin`
+      );
+
+
+    const newData =
+      response.data.data;
+
+
+    if (Array.isArray(newData)) {
+
+      // Admin can see all violations
+      if (getOfficer.role === "admin") {
+
+        setViolations(newData);
+
+      }
+
+      // Officer can see only their zone violations
+      else {
+
+        const filterData =
+          newData.filter(
+            (violation) =>
+              violation.location ===
+              getOfficer.zone
+          );
+
+
+        setViolations(filterData);
+
+      }
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "Error fetching violations:",
+      error
+    );
+
+  } finally {
+
+    setLoading(false);
+
+  }
+
+};
+
+
+  // ======================================================
+  // INITIAL LOAD + AUTO UPDATE
+  // ======================================================
+
+  useEffect(() => {
+
+
+    // Load immediately
+
+    getViolations();
+
+
+    // Fetch every 5 seconds
+
+    const interval =
+      setInterval(
+        () => {
+
+          getViolations();
+
+
+        },
+        5000
+      );
+
+
+    return () => {
+
+      clearInterval(
+        interval
+      );
+
+    };
+
+  }, []);
+
+
+  useEffect(() => {
+localStorage.setItem(
+  "violations",
+  JSON.stringify(violations)
+);
+
+}, [violations]);
+
+
+
+ 
+
+
+  // ======================================================
+  // SHOW ONLY LAST 4 ITEMS
+  // ======================================================
+
+  const visibleViolations =
+    showAll
+
+      ? violations
+
+      : violations.slice(
+          -10
+        );
+
+
+  if (
+    loading
+  ) {
+
+    return (
+
+      <div
+        className="
+          w-full
+          p-5
+          text-center
+          text-slate-400
+        "
+      >
+
+        Loading...
+
+      </div>
+
+    );
+
+  }
+
+
+ 
+  return (
+
+    <div
+      className="
+        w-full
+        bg-slate-950/60
+        border
+        border-blue-950/40
+        rounded-3xl
+        p-5
+        backdrop-blur-xl
+      "
+    >
+
+      {/* HEADER */}
+
+    <div
+  className="
+    flex
+    items-center
+    justify-between
+    mb-4
+  "
+>
+
+  {/* LEFT SIDE */}
+
+  <div
+    className="
+      flex
+      items-center
+      gap-2
+    "
+  >
+
+    <ShieldAlert
+      size={16}
+      className="text-red-400"
+    />
+
+    <h2
+      className="
+        text-[10px]
+        font-bold
+        text-white
+        uppercase
+        tracking-widest
+      "
+    >
+      AI Violation Alerts
+    </h2>
+
+
+    {/* VIOLATION COUNT */}
+
+    <span
+      className="
+        min-w-[22px]
+        h-[22px]
+        px-1.5
+        flex
+        items-center
+        justify-center
+        rounded-full
+        bg-red-500/10
+        border
+        border-red-500/20
+        text-red-400
+        text-[10px]
+        font-bold
+      "
+    >
+      {violations.length}
+    </span>
+
+  </div>
+
+
+  {/* SHOW MORE BUTTON */}
+
+  {violations.length > 4 && (
+
+    <button
+      onClick={() =>
+        navigate("/violation")
+      }
+      className="
+        flex
+        items-center
+        gap-1
+        px-3
+        py-2
+        rounded-lg
+        bg-blue-500/10
+        border
+        border-blue-500/20
+        text-blue-400
+        text-[8px]
+        font-bold
+        hover:bg-blue-500/20
+        transition-all
+        cursor-pointer
+      "
+    >
+
+      সব দেখুন
+
+    </button>
+
+  )}
+
+</div>
+
+
+      {/* SCROLLABLE LIST */}
+
+      <div
+       
+        className="
+          flex
+          flex-col
+          gap-3
+          max-h-[500px]
+          overflow-y-auto
+          pr-2
+        "
+      >
+
+        {visibleViolations.map(
+          (
+            violation
+          ) => (
+
+            <ViolationCard
+              key={
+                violation._id
+              }
+              violation={
+                violation
+              }
+            />
+
+          )
+        )}
+
+      </div>
+
+    </div>
+
+  );
+
+};
+
+
+export default ViolationList;
