@@ -26,12 +26,10 @@ const officerData = new moongose.Schema(
         },
         zone:{
             type: String,
-            required: true
-            
+            required: true, 
         }
     })
 
 export default moongose.model("officer", officerData);
-
 
 

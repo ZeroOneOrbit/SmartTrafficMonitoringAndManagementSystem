@@ -1,5 +1,12 @@
 @import "tailwindcss";
-@import "maplibre-gl/dist/maplibre-gl.css";
+
+/* ── Global Base ──────────────────────────────────────── */
+html, body, #root {
+  background-color: #030B1A;
+  color: #f8fafc;
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+  min-height: 100%;
+}
 
 
 /* Moving car keyframe for camera thumbnails */
@@ -16,4 +23,8 @@
 @keyframes scanline {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(100%); }
+}
+
+.animate-scanline {
+  animation: scanline 4s linear infinite;
 }
